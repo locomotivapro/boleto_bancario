@@ -351,8 +351,7 @@ module BoletoBancario
       # @return [String] Precisa retornar 10 dígitos para o código de barras (incluindo os centavos).
       #
       def valor_formatado_para_codigo_de_barras
-        real, centavos = valor_documento.to_s.split(/\./)
-        centavos = "00" if centavos.nil?
+        real, centavos = valor_documento.to_f.to_s.split(/\./)
         centavos = centavos[0,2]
         "#{real.rjust(8, '0')}#{centavos.ljust(2, '0')}"
       end
