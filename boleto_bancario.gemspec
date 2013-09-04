@@ -25,4 +25,5 @@ Gem::Specification.new do |gem|
   gem.add_development_dependency "pry", "~> 0.9"
   gem.add_development_dependency "simplecov", "~> 0.2"
   gem.add_development_dependency "simplecov-html", "~> 0.7"
+  gem.add_development_dependency "yard", "~> 0.8.7"
 end
