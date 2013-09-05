@@ -1,4 +1,5 @@
 # -*- encoding: utf-8 -*-
+require 'psych'
 require File.expand_path('../lib/boleto_bancario/version', __FILE__)
 
 Gem::Specification.new do |gem|
