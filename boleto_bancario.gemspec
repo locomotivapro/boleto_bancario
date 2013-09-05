@@ -1,12 +1,11 @@
 # -*- encoding: utf-8 -*-
-require 'psych'
 require File.expand_path('../lib/boleto_bancario/version', __FILE__)
 
 Gem::Specification.new do |gem|
   gem.authors       = ["Tomas D'Stefano"]
   gem.email         = ["tomas_stefano@successoft.com"]
-  gem.description   = %q{Emissão de Boletos Bancários em Ruby}
-  gem.summary       = %q{Emissão de Boletos Bancários em Ruby}
+  gem.description   = %q{Emissao de Boletos Bancarios em Ruby}
+  gem.summary       = %q{Emissao de Boletos Bancarios em Ruby}
   gem.homepage      = "https://github.com/tomas-stefano/boleto_bancario"
 
   gem.files         = `git ls-files`.split($\).reject { |f| File.extname(f).downcase == '.pdf' }
