@@ -151,6 +151,10 @@ module BoletoBancario
         "Santander"
       end
 
+      def barcode
+        codigo_de_barras_do_banco
+      end
+
       def agencia
         @agencia.to_s.rjust(4, '0') if @agencia.present?
       end
