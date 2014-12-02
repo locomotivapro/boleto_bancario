@@ -20,6 +20,7 @@ Gem::Specification.new do |gem|
   gem.add_dependency "activemodel", "~> 4.1.5"
   gem.add_dependency "actionpack", "~> 4.1.5"
   gem.add_dependency "barby"
+  gem.add_dependency "prawn"
 
   gem.add_development_dependency "rspec", "~> 2.13"
   gem.add_development_dependency "yard"
