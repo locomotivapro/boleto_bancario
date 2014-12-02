@@ -1,7 +1,6 @@
 # encoding: utf-8
 require 'prawn'
-require 'prawn/grid'
-require 'prawn/table'
+require 'prawn/layout'
 require 'barby'
 require 'barby/barcode/code_25_interleaved'
 require 'barby/outputter/prawn_outputter'
