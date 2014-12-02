@@ -1,4 +1,11 @@
 # encoding: utf-8
+require 'prawn'
+require 'prawn/layout'
+require 'prawn/fast_png'
+require 'barby'
+require 'barby/barcode/code_25_interleaved'
+require 'barby/outputter/prawn_outputter'
+
 module BoletoBancario
   module Core
     # Implementação de emissão de boleto bancário pelo Santander.
@@ -81,6 +88,17 @@ module BoletoBancario
         12
       end
 
+      # Tamanho máximo da carteira.
+      # O tamanho máximo é justamente 2 porque no código de barras só é permitido 2 posições para este campo.
+      #
+      # <b>Método criado justamente para ficar documentado o tamanho máximo aceito até a data corrente.</b>
+      #
+      # @return [Fixnum] 2
+      #
+      def self.tamanho_maximo_carteira
+        3
+      end
+
       # Tamanho máximo do código do cedente emitido no Boleto.
       # O tamanho máximo é justamente 7 porque no código de barras só é permitido 7 posições para este campo.
       #
@@ -92,24 +110,14 @@ module BoletoBancario
         7
       end
 
-      # <b>Carteiras suportadas.</b>
-      #
-      # <b>Método criado para validar se a carteira informada é suportada.</b>
-      #
-      # @return [Array]
-      #
-      def self.carteiras_suportadas
-        %w[101 102 121]
-      end
-
-      # Validações para os campos abaixo:
+      # Validações de tamanho para os campos abaixo:
       #
       # * Número do documento
       # * Conta Corrente
       # * Agencia
       # * Carteira
       #
-      # Se você quiser sobrescrever os metodos, <b>ficará a sua responsabilidade.</b>
+      # Se você quiser sobrescrever os tamanhos permitidos, <b>ficará a sua responsabilidade.</b>
       # Basta você sobrescrever os métodos de validação:
       #
       #    class Santander < BoletoBancario::Core::Santander
@@ -124,10 +132,6 @@ module BoletoBancario
       #       def self.tamanho_maximo_numero_documento
       #         9
       #       end
-      #
-      #       def self.carteiras_suportadas
-      #         %w[101 102 121]
-      #       end
       #    end
       #
       # Obs.: Mudar as regras de validação podem influenciar na emissão do boleto em si.
@@ -139,8 +143,7 @@ module BoletoBancario
       validates :agencia,          length: { maximum: tamanho_maximo_agencia          }, if: :deve_validar_agencia?
       validates :codigo_cedente,   length: { maximum: tamanho_maximo_codigo_cedente   }, if: :deve_validar_codigo_cedente?
       validates :numero_documento, length: { maximum: tamanho_maximo_numero_documento }, if: :deve_validar_numero_documento?
-
-      validates :carteira, inclusion: { in: ->(object) { object.class.carteiras_suportadas } }, if: :deve_validar_carteira?
+      validates :carteira,         length: { maximum: tamanho_maximo_carteira         }, if: :deve_validar_carteira?
 
       # @return [String] 4 caracteres
       #
@@ -158,6 +161,12 @@ module BoletoBancario
       #
       def numero_documento
         @numero_documento.to_s.rjust(12, '0') if @numero_documento.present?
+      end
+
+      # @return [String] 3 caracteres
+      #
+      def carteira
+        @carteira.to_s.rjust(3, '0') if @carteira.present?
       end
 
       # Formata a carteira dependendo se ela é registrada ou não.
@@ -205,7 +214,7 @@ module BoletoBancario
       # @return [String]
       #
       def agencia_codigo_cedente
-        "#{agencia} / #{codigo_cedente}"
+        "#{agencia}-#{digito_agencia} / #{codigo_cedente}"
       end
 
       # Mostra o campo nosso número calculando o dígito verificador do nosso número.
@@ -259,6 +268,7 @@ module BoletoBancario
       #
       # Seguradoras (Se 7% informar 7. Limitado a 9%)
       # <b>Demais clientes usar 0 (zero)</b>
+      # O padrão é zero.
       #
       # @return [String]
       #
@@ -268,9 +278,83 @@ module BoletoBancario
         '0'
       end
 
-      def to_html
-        HTMLRenderer.render(self)
+      #  === Geração do PDF
+      #
+      # Colocando aqui temporariamente para gerar o boleto para homologação o mais rapido possivel
+      # TODO: colocar em um modulo de apresentação, para ser usado pelos boletos dos outros bancos
+
+      # Métodos afanados do https://github.com/riopro/kill_bill/blob/master/lib/bank/base.rb:
+
+      TABLE_DEFAULTS = {
+        :position => :left,
+        :font_size => 8,
+        :border_width => 0,
+        :align => :left,
+        :vertical_padding => 6
+      }
+
+      def pdf_parameters(pdf)
+        # TODO: move to accessor or find equivalent
+        instrucoes = ["Pagável em qualquer agência até o vencimento.", "Após, favor solicitar outro."]
+
+        @barcode = self.barcode
+        pdf.font "Helvetica", { :size => 8 }
+        # User receipt
+        pdf.move_down 86
+        data = [ [self.cedente, "#{self.agencia}/#{self.codigo_cedente}", "R$", {:text => "1", :align => :center}, "#{self.nosso_numero}-#{self.digito_nosso_numero}"]]
+        pdf.table( data, TABLE_DEFAULTS.merge(:column_widths => { 0 => 270, 1 => 96, 2 => 44, 3 => 40, 4 => 100}) )
+        data = [ [self.document_number, self.documento_sacado, self.data_vencimento, self.valor_documento ]]
+        pdf.table data, TABLE_DEFAULTS.merge(:column_widths => { 0 => 160, 1 => 120, 2 => 120, 3 => 140 })
+        pdf.move_down 16
+        pdf.table [[self.sacado]], TABLE_DEFAULTS
+        pdf.table [[self.instrucoes[0]]], TABLE_DEFAULTS
+
+        # Bank Compensation Form
+        pdf.text_box self.typeable_line(@barcode), :at => [190, 335], :size => 12
+        pdf.y = 350
+        pdf.table [[self.local_pagamento, self.data_vencimento ]], TABLE_DEFAULTS.merge(:column_widths => { 0 => 450 } )
+        pdf.table [["#{self.cedente} - #{self.documento_sacado}", "#{self.agencia}-#{self.digito_agencia}/#{self.codigo_cedente}" ]], TABLE_DEFAULTS.merge(:column_widths => { 0 => 450 } )
+        pdf.table [
+          [
+            self.documented_at.to_s_br,
+            self.document_number,
+            self.document_specie,
+            self.need_acceptation,
+            self.processed_at.to_s_br,
+            "#{self.carteira}/#{self.nosso_numero}-#{self.digito_nosso_numero}"
+          ]
+          ], TABLE_DEFAULTS.merge(:column_widths => { 0 => 100, 1 => 100, 2 => 80, 3 => 40, 4 => 100 } )
+          pdf.table [["", self.carteira, "R$", 1, self.valor_documento, number_to_currency(self.valor_documento)]], TABLE_DEFAULTS.merge(:column_widths => { 0 => 100, 1 => 100, 2 => 80, 3 => 40, 4 => 100 } )
+          y  = 210
+          self.instrucoes.each do |instruction|
+            pdf.text_box instruction, :at => [5, y]
+            y -= pdf.font.height
+          end
+          pdf.text_box self.sacado, :at => [5, 116]
+          pdf.text_box self.endereco_cedente, :at => [5, 106]
+          pdf.text_box '', :at => [5, 96]
+          # end with barcode
+          my_barcode = Barby::Code25Interleaved.new(@barcode)
+          my_barcode.annotate_pdf(pdf, { :height => 30, :y => -20, :x => 0, :xdim => 0.8 })
+        end
+
+        # You can pass a parameter defining an alternative background image type
+        # Possible types are: :png (default) or :jpg
+        def to_pdf(background_type=:png)
+          @pdf = Prawn::Document.new(:background => File.dirname(__FILE__) + "/../images/#{self.bank.downcase}.#{background_type}")
+          self.pdf_parameters(@pdf)
+          @pdf.render
+        end
+
+        # Render class attributes to pdf file. Saves pdf to the destination
+        # setted in the filename parameter
+        # You could pass a parameter defining an alternative background image type
+        # Possible types are: :png (default) or :jpg
+        def to_pdf_file(filename = nil, background_type=:png)
+          Prawn::Document.generate(filename, :background => File.dirname(__FILE__) + "/../images/#{self.bank.downcase}.#{background_type}") do |pdf|
+            self.pdf_parameters(pdf)
+          end
+        end
       end
     end
   end
-end
