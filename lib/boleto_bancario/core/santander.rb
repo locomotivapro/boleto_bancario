@@ -146,6 +146,11 @@ module BoletoBancario
 
       # @return [String] 4 caracteres
       #
+
+      def banco
+        "Santander"
+      end
+
       def agencia
         @agencia.to_s.rjust(4, '0') if @agencia.present?
       end
@@ -340,7 +345,7 @@ module BoletoBancario
         # You can pass a parameter defining an alternative background image type
         # Possible types are: :png (default) or :jpg
         def to_pdf(background_type=:png)
-          @pdf = Prawn::Document.new(:background => File.dirname(__FILE__) + "/../images/#{self.bank.downcase}.#{background_type}")
+          @pdf = Prawn::Document.new(:background => File.dirname(__FILE__) + "/../images/#{self.banco.downcase}.#{background_type}")
           self.pdf_parameters(@pdf)
           @pdf.render
         end
@@ -350,7 +355,7 @@ module BoletoBancario
         # You could pass a parameter defining an alternative background image type
         # Possible types are: :png (default) or :jpg
         def to_pdf_file(filename = nil, background_type=:png)
-          Prawn::Document.generate(filename, :background => File.dirname(__FILE__) + "/../images/#{self.bank.downcase}.#{background_type}") do |pdf|
+          Prawn::Document.generate(filename, :background => File.dirname(__FILE__) + "/../images/#{self.banco.downcase}.#{background_type}") do |pdf|
             self.pdf_parameters(pdf)
           end
         end
